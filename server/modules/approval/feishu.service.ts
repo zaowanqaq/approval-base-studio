@@ -109,17 +109,17 @@ export class FeishuService {
   }
 
   private redirectUri(req: RequestOriginSource): string {
-    if (this.config.oauthRedirectUri) return this.config.oauthRedirectUri;
-    // OAuth 先回到前端页面，再由前端 POST code/state，避免妙搭网关拦截 API GET 的 CSRF 校验。
+    const configured = this.config.oauthRedirectUri;
+    if (configured) {
+      return configured.endsWith('/api/oauth/callback')
+        ? configured.slice(0, -'/api/oauth/callback'.length) || this.requestOrigin(req)
+        : configured;
+    }
     return this.requestOrigin(req) + (this.config.clientBasePath || '');
   }
 
   private frontendRedirectUri(req: RequestOriginSource): string {
-    const callbackUri = this.config.oauthRedirectUri;
-    if (callbackUri?.endsWith('/api/oauth/callback')) {
-      return callbackUri.slice(0, -'/api/oauth/callback'.length) || this.requestOrigin(req);
-    }
-    return callbackUri || this.requestOrigin(req) + (this.config.clientBasePath || '');
+    return this.redirectUri(req);
   }
 
   createOAuthFrontendRedirect(req: RequestOriginSource, code: string, state: string): string {

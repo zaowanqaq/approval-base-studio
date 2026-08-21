@@ -124,4 +124,6 @@ export const pluginProfileApi = {
 
 export const authApi = {
   me: () => pluginRequest<FeishuAuthStatus>('/api/auth/me', 'GET'),
+  callback: (input: { code: string; state: string }) =>
+    pluginRequest<{ ok: boolean; session: string }>('/api/oauth/callback', 'POST', input),
 };

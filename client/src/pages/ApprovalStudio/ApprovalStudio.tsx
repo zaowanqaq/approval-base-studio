@@ -96,6 +96,24 @@ const PluginConfigPage: React.FC = () => {
     void refreshAuthStatus();
   }, []);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+    if (!code || !state) return;
+    setAuthLoading(true);
+    authApi.callback({ code, state })
+      .then((result) => {
+        if (result.session) window.localStorage.setItem('approval_feishu_session', result.session);
+        window.history.replaceState({}, '', window.location.pathname);
+        return refreshAuthStatus();
+      })
+      .catch((cause: unknown) => {
+        setAuthError(cause instanceof Error ? cause.message : '飞书授权失败');
+        setAuthLoading(false);
+      });
+  }, []);
+
   function configForUi(config: BasePluginProfileConfig): BasePluginProfileConfig {
     return {
       ...config,
