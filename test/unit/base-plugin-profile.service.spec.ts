@@ -1,4 +1,4 @@
-import { BasePluginProfileService } from '../../server/modules/payment/base-plugin-profile.service';
+import { BasePluginProfileService } from '../../server/modules/approval/base-plugin-profile.service';
 import type { BasePluginProfileConfig } from '../../shared/approval';
 import type { PostgresJsDatabase } from '@lark-apaas/fullstack-nestjs-core';
 
@@ -6,7 +6,7 @@ function profileConfig(): BasePluginProfileConfig {
   return {
     version: 1,
     page: { title: '审批提审', visibleModules: [] },
-    businessModules: ['payment'],
+    businessModules: ['approvals'],
     targetApprovals: [],
   };
 }

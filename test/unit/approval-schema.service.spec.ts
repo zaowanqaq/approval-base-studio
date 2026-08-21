@@ -1,6 +1,6 @@
-import type { FeishuService } from '../../server/modules/payment/feishu.service';
-import type { ApprovalDefinition } from '../../server/modules/payment/approval-schema.service';
-import { ApprovalSchemaService, approvalSchemaFingerprint } from '../../server/modules/payment/approval-schema.service';
+import type { FeishuService } from '../../server/modules/approval/feishu.service';
+import type { ApprovalDefinition } from '../../server/modules/approval/approval-schema.service';
+import { ApprovalSchemaService, approvalSchemaFingerprint } from '../../server/modules/approval/approval-schema.service';
 import type { ApprovalSchema } from '../../shared/approval';
 
 describe('ApprovalSchemaService', () => {

@@ -1,4 +1,4 @@
-import { sourceValue } from '../../server/modules/payment/source-sync.service';
+import { sourceValue } from '../../server/modules/approval/source-sync.service';
 
 describe('SourceSyncService value mapping', () => {
   it('keeps amount values as strings to avoid floating point conversion', () => {

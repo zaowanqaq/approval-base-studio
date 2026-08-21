@@ -2,16 +2,15 @@ import React from 'react';
 import { Route, Routes } from 'react-router-dom';
 
 import Layout from './components/Layout';
+import ApprovalStudioPage from './pages/ApprovalStudio/ApprovalStudio';
 import NotFound from './pages/NotFound/NotFound';
-import PaymentConsole from './pages/PaymentConsole/PaymentConsole';
-import PluginConfigPage from './pages/PluginConfig/PluginConfig';
 
 const RoutesComponent = () => {
   return (
     <Routes>
       <Route element={<Layout />}>
-        <Route index element={<PaymentConsole />} />
-        <Route path="config" element={<PluginConfigPage />} />
+        <Route index element={<ApprovalStudioPage />} />
+        <Route path="config" element={<ApprovalStudioPage />} />
       </Route>
       <Route path="*" element={<NotFound />} />
     </Routes>

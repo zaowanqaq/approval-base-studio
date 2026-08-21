@@ -1,12 +1,12 @@
-import { TargetLaunchService } from '../../server/modules/payment/target-launch.service';
-import type { ApprovalSchemaService } from '../../server/modules/payment/approval-schema.service';
-import type { ApprovalSubmissionService } from '../../server/modules/payment/approval-submission.service';
-import type { BitableRecordService } from '../../server/modules/payment/bitable-record.service';
-import type { BasePluginProfileService } from '../../server/modules/payment/base-plugin-profile.service';
-import type { FeishuService } from '../../server/modules/payment/feishu.service';
-import type { TargetLaunchStateService } from '../../server/modules/payment/target-launch-state.service';
+import { TargetLaunchService } from '../../server/modules/approval/target-launch.service';
+import type { ApprovalSchemaService } from '../../server/modules/approval/approval-schema.service';
+import type { ApprovalSubmissionService } from '../../server/modules/approval/approval-submission.service';
+import type { BitableRecordService } from '../../server/modules/approval/bitable-record.service';
+import type { BasePluginProfileService } from '../../server/modules/approval/base-plugin-profile.service';
+import type { FeishuService } from '../../server/modules/approval/feishu.service';
+import type { TargetLaunchStateService } from '../../server/modules/approval/target-launch-state.service';
 import type { ApprovalSchema, BasePluginProfileResponse } from '../../shared/approval';
-import { approvalSchemaFingerprint } from '../../server/modules/payment/approval-schema.service';
+import { approvalSchemaFingerprint } from '../../server/modules/approval/approval-schema.service';
 
 const schema: ApprovalSchema = {
   approvalCode: 'approval-target-test-001',
@@ -26,7 +26,7 @@ function profile(): BasePluginProfileResponse {
     config: {
       version: 1,
       page: { title: '审批提审', visibleModules: [] },
-      businessModules: ['payment'],
+      businessModules: ['approvals'],
       targetApprovals: [{
         approvalSchemaFingerprint: approvalSchemaFingerprint(schema),
         targetTableBinding: {

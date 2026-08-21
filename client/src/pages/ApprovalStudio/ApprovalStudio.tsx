@@ -14,17 +14,18 @@ import {
 import { Badge } from '@client/src/components/ui/badge';
 import { Button } from '@client/src/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@client/src/components/ui/card';
-import { Checkbox } from '@client/src/components/ui/checkbox';
 import { Input } from '@client/src/components/ui/input';
 import { Label } from '@client/src/components/ui/label';
 import { authApi, pluginProfileApi, type FeishuAuthStatus } from '@client/src/api';
-import { resolveSelectedRecordContext } from '@client/src/pages/PaymentConsole/base-context';
+import { extractBaseToken } from '@client/src/lib/base-reference';
+import { resolveSelectedRecordContext } from '@client/src/lib/base-context';
 import type {
   ApprovalSchema,
   ApprovalDefinitionSummary,
   BasePluginTargetConfiguration,
   BasePluginProfileConfig,
   BasePluginProfileResponse,
+  SourceProvisioningResponse,
   TargetFieldAtomicSourceInput,
   TargetFieldBinding,
   TargetFieldSourceInput,
@@ -34,8 +35,8 @@ import type {
 
 const DEFAULT_PROFILE_CONFIG: BasePluginProfileConfig = {
   version: 1,
-  page: { title: '审批提审', visibleModules: [] },
-  businessModules: ['payment'],
+  page: { title: 'Approval Base Studio', visibleModules: ['approvals'], sourceSyncIntervalSeconds: 60 },
+  businessModules: ['approvals'],
   targetApprovals: [],
 };
 
@@ -57,11 +58,13 @@ const PluginConfigPage: React.FC = () => {
   const [launchableApprovals, setLaunchableApprovals] = useState<ApprovalDefinitionSummary[]>([]);
   const [launchablePageToken, setLaunchablePageToken] = useState<string | undefined>(undefined);
   const [tableName, setTableName] = useState<string>('');
-  const [pageTitle, setPageTitle] = useState<string>('审批提审');
-  const [paymentEnabled, setPaymentEnabled] = useState<boolean>(true);
+  const [pageTitle, setPageTitle] = useState<string>('Approval Base Studio');
+  const [sourceSyncIntervalSeconds, setSourceSyncIntervalSeconds] = useState<number>(60);
   const [schema, setSchema] = useState<ApprovalSchema | null>(null);
   const [profile, setProfile] = useState<BasePluginProfileResponse | null>(null);
   const [targetResult, setTargetResult] = useState<TargetProvisioningResponse | null>(null);
+  const [sourceResult, setSourceResult] = useState<SourceProvisioningResponse | null>(null);
+  const [sourceTableName, setSourceTableName] = useState<string>('');
   const [fieldSources, setFieldSources] = useState<Record<string, TargetFieldSourceInput>>({});
   const [launchApprovalCode, setLaunchApprovalCode] = useState<string>('');
   const [launchSchema, setLaunchSchema] = useState<ApprovalSchema | null>(null);
@@ -98,10 +101,11 @@ const PluginConfigPage: React.FC = () => {
       ...config,
       page: {
         ...config.page,
-        title: pageTitle.trim() || '审批提审',
-        visibleModules: paymentEnabled ? ['payment'] : [],
+        title: pageTitle.trim() || 'Approval Base Studio',
+        visibleModules: ['approvals'],
+        sourceSyncIntervalSeconds,
       },
-      businessModules: paymentEnabled ? ['payment'] : [],
+      businessModules: ['approvals'],
     };
   }
 
@@ -194,7 +198,7 @@ const PluginConfigPage: React.FC = () => {
       if (nextProfile?.config) {
         setBaseName(nextProfile.baseName || '');
         setPageTitle(nextProfile.config.page.title);
-        setPaymentEnabled(nextProfile.config.businessModules.includes('payment'));
+        setSourceSyncIntervalSeconds(nextProfile.config.page.sourceSyncIntervalSeconds || 60);
         setLaunchApprovalCode((current) => current || nextProfile.config.targetApprovals[0]?.targetTableBinding.targetApprovalCode || '');
         applyStoredTargetSources(nextProfile);
       }
@@ -293,6 +297,56 @@ const PluginConfigPage: React.FC = () => {
       setMessage(`已创建提审表：${result.targetTableBinding.baseTableName}`);
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : '创建提审表失败');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function createSourceTable(): Promise<void> {
+    if (!baseUrl.trim() || !approvalCode.trim()) {
+      setError('请先填写 Base 链接和审批 Code');
+      return;
+    }
+    setWorking(true);
+    setError('');
+    setMessage('');
+    try {
+      const result = await pluginProfileApi.provisionSource({
+        approvalCode: approvalCode.trim(),
+        destination: {
+          kind: 'existing-base',
+          baseAppToken: extractBaseToken(baseUrl.trim()),
+          ...(sourceTableName.trim() ? { tableName: sourceTableName.trim() } : {}),
+        },
+        baseUrl: baseUrl.trim(),
+      });
+      setSourceResult(result);
+      const nextProfile = await pluginProfileApi.get(baseUrl.trim());
+      setProfile(nextProfile);
+      setMessage(`已创建同步表：${result.sourceTableBinding.baseTableName}`);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : '创建 Source 同步表失败');
+    } finally {
+      setWorking(false);
+    }
+  }
+
+  async function syncSourceNow(): Promise<void> {
+    if (!baseUrl.trim() || !approvalCode.trim()) {
+      setError('请先填写 Base 链接和审批 Code');
+      return;
+    }
+    setWorking(true);
+    setError('');
+    try {
+      const result = await pluginProfileApi.syncSource({
+        baseUrl: baseUrl.trim(),
+        approvalCode: approvalCode.trim(),
+      });
+      const state = result.syncState;
+      setMessage(`同步完成：新增/更新 ${state.lastSyncedCount || 0} 条，跳过 ${state.lastSkippedCount || 0} 条`);
+    } catch (cause: unknown) {
+      setError(cause instanceof Error ? cause.message : 'Source 同步失败');
     } finally {
       setWorking(false);
     }
@@ -435,7 +489,7 @@ const PluginConfigPage: React.FC = () => {
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Layers3 className="size-4" /> Base 级插件配置
           </div>
-          <h1 className="text-3xl font-semibold tracking-tight">审批提审配置</h1>
+          <h1 className="text-3xl font-semibold tracking-tight">通用审批工作台配置</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
             Source 同步由插件自动使用审批 API 完成。这里负责识别审批流程、创建数据表和保存这个 Base 的页面配置。
           </p>
@@ -809,19 +863,35 @@ const PluginConfigPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>3. 创建提审 Table</CardTitle>
-            <CardDescription>每个目标审批流在同一个 Base 下对应一个独立提审 Table。</CardDescription>
+            <CardTitle>3. 创建 Source / Target Table</CardTitle>
+            <CardDescription>同一审批流可分别创建实例同步表和提发表；字段映射由审批 Schema 自动生成。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-[1fr_auto]">
             <div className="grid gap-2">
               <Label htmlFor="table-name">Table 名称（可选）</Label>
               <Input id="table-name" value={tableName} onChange={(event) => setTableName(event.target.value)} placeholder="默认使用审批名称-提审" />
             </div>
-            <div className="flex items-end">
+            <div className="grid gap-2">
+              <Label htmlFor="source-table-name">Source Table 名称（可选）</Label>
+              <Input id="source-table-name" value={sourceTableName} onChange={(event) => setSourceTableName(event.target.value)} placeholder="默认使用审批名称" />
+            </div>
+            <div className="flex flex-wrap items-end gap-2 md:col-span-2">
               <Button type="button" onClick={() => void createTargetTable()} disabled={working}>
                 {working ? <LoaderCircle className="animate-spin" /> : <Table2 />}创建提审表
               </Button>
+              <Button type="button" variant="outline" onClick={() => void createSourceTable()} disabled={working}>
+                {working ? <LoaderCircle className="animate-spin" /> : <Table2 />}创建同步表
+              </Button>
+              <Button type="button" variant="outline" onClick={() => void syncSourceNow()} disabled={working}>
+                {working ? <LoaderCircle className="animate-spin" /> : <Play />}立即同步
+              </Button>
             </div>
+            {sourceResult && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
+                <CheckCircle2 className="size-4 text-primary" />
+                已绑定 Source：{sourceResult.sourceTableBinding.baseTableName} · {sourceResult.syncedFieldBindings.length} 个字段
+              </div>
+            )}
             {targetResult && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
                 <CheckCircle2 className="size-4 text-primary" />
@@ -833,18 +903,25 @@ const PluginConfigPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>4. 页面和业务模块</CardTitle>
-            <CardDescription>这里只保存配置，不保存可执行脚本；付款逻辑仍由服务端模块提供。</CardDescription>
+            <CardTitle>4. 页面与同步策略</CardTitle>
+            <CardDescription>按 Base 保存页面标题和 Source 同步频率；所有绑定都来自当前租户配置。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="page-title">页面标题</Label>
               <Input id="page-title" value={pageTitle} onChange={(event) => setPageTitle(event.target.value)} />
             </div>
-            <Label className="flex items-center gap-3">
-              <Checkbox checked={paymentEnabled} onCheckedChange={(checked: boolean | 'indeterminate') => setPaymentEnabled(checked === true)} />
-              <span>启用付款业务模块</span>
-            </Label>
+            <div className="grid gap-2">
+              <Label htmlFor="sync-interval">Source 同步间隔（秒）</Label>
+              <Input
+                id="sync-interval"
+                type="number"
+                min={10}
+                max={86400}
+                value={sourceSyncIntervalSeconds}
+                onChange={(event) => setSourceSyncIntervalSeconds(Number(event.target.value))}
+              />
+            </div>
             <div className="flex justify-end">
               <Button type="button" variant="outline" onClick={() => void saveProfile()} disabled={working}>
                 {working ? <LoaderCircle className="animate-spin" /> : <Save />}保存 Base 配置

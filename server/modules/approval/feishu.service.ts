@@ -1,20 +1,67 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { PaymentConfig } from './payment.config';
-import type { OAuthToken } from './payment.types';
+import type { OAuthToken } from './feishu.types';
+
+export interface ApprovalRuntimeConfig {
+  appId: string;
+  appSecret: string;
+  sessionSecret: string;
+  oauthRedirectUri?: string;
+  clientBasePath?: string;
+  oauthScopes: string;
+}
+
+function normalizeEnvValue(value: string | undefined): string {
+  return (value || '')
+    .trim()
+    .replace(/^['"]|['"]$/g, '')
+    .replace(/\\r\\n|\\r|\\n/g, '')
+    .trim();
+}
+
+@Injectable()
+export class ApprovalConfig implements ApprovalRuntimeConfig {
+  readonly appId = normalizeEnvValue(process.env.FEISHU_APP_ID);
+  readonly appSecret = normalizeEnvValue(process.env.FEISHU_APP_SECRET);
+  readonly sessionSecret = normalizeEnvValue(process.env.APPROVAL_SESSION_SECRET);
+  readonly oauthRedirectUri = normalizeEnvValue(process.env.FEISHU_OAUTH_REDIRECT_URI);
+  readonly clientBasePath = normalizeEnvValue(process.env.CLIENT_BASE_PATH).replace(/\/$/, '');
+  readonly oauthScopes = [
+    'auth:user.id:read',
+    'offline_access',
+    'approval:approval:read',
+    'approval:instance:read',
+    'approval:instance:write',
+    'bitable:app',
+    'base:record:read',
+    'base:record:update',
+    'base:table:read',
+    'docs:document.media:download',
+  ].join(' ');
+
+  constructor() {
+    for (const [name, value] of Object.entries({
+      FEISHU_APP_ID: this.appId,
+      FEISHU_APP_SECRET: this.appSecret,
+      APPROVAL_SESSION_SECRET: this.sessionSecret,
+    })) {
+      if (!value) throw new Error(`缺少环境变量 ${name}`);
+    }
+  }
+}
 
 type FeishuEnvelope<T> = { code?: number; msg?: string; data?: T } & T;
 type RequestOriginSource = Pick<Request, 'headers' | 'protocol' | 'get'>;
 
 @Injectable()
 export class FeishuService {
-  private readonly tokenCookie = 'payment_feishu_token';
+  private readonly tokenCookie = 'approval_feishu_token';
   private readonly key: Buffer;
   private readonly userTokens = new Map<string, OAuthToken>();
   private tenantToken?: { value: string; expiresAt: number };
 
-  constructor(private readonly config: PaymentConfig) {
+  constructor(private readonly config: ApprovalConfig) {
     this.key = createHash('sha256').update(config.sessionSecret).digest();
   }
 
@@ -142,7 +189,7 @@ export class FeishuService {
   }
 
   async userToken(req: Request, res: Response, required = true): Promise<string | null> {
-    const headerSession = req.get('x-payment-session') || '';
+    const headerSession = req.get('x-approval-session') || '';
     const userKey = this.userKey(req);
     let token = this.unseal<OAuthToken>(headerSession) || this.unseal<OAuthToken>(this.cookies(req)[this.tokenCookie]) || (userKey ? this.userTokens.get(userKey) : undefined);
     if (!token || token.refreshExpiresAt <= Date.now()) {
@@ -172,7 +219,7 @@ export class FeishuService {
       if (userKey) this.userTokens.set(userKey, token);
       this.writeToken(res, token);
     }
-    if (headerSession) res.setHeader('X-Payment-Session', this.seal(token));
+    if (headerSession) res.setHeader('X-Approval-Session', this.seal(token));
     return token.accessToken;
   }
 

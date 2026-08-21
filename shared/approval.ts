@@ -90,12 +90,14 @@ export interface SyncPolicy {
   acceptedStatuses: string[];
   tableStrategy: 'one-table-per-source';
   mode?: 'api';
+  intervalSeconds?: number;
 }
 
 export const SyncPolicySchema = z.object({
   acceptedStatuses: z.array(nonEmptyString).min(1),
   tableStrategy: z.literal('one-table-per-source'),
   mode: z.literal('api').optional(),
+  intervalSeconds: z.number().int().min(10).max(86400).optional(),
 });
 
 export interface SourceSyncState {
@@ -643,17 +645,19 @@ export const TargetFieldMatchSuggestionSchema = z.object({
   reason: z.enum(['name-and-type', 'name-only', 'type-only', 'no-match']),
 });
 
-export const BusinessModuleSchema = z.enum(['payment']);
+export const BusinessModuleSchema = z.enum(['approvals']);
 export type BusinessModule = z.infer<typeof BusinessModuleSchema>;
 
 export interface BasePluginPageConfig {
   title: string;
   visibleModules: BusinessModule[];
+  sourceSyncIntervalSeconds?: number;
 }
 
 export const BasePluginPageConfigSchema = z.object({
   title: nonEmptyString,
   visibleModules: z.array(BusinessModuleSchema),
+  sourceSyncIntervalSeconds: z.number().int().min(10).max(86400).optional(),
 });
 
 export interface BasePluginTargetConfiguration {

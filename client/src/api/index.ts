@@ -10,6 +10,8 @@ import type {
   TargetFieldMatchSuggestion,
   TargetProvisioningRequest,
   TargetProvisioningResponse,
+  SourceProvisioningRequest,
+  SourceProvisioningResponse,
   SourceSyncResponse,
 } from '@shared/approval';
 
@@ -35,7 +37,7 @@ async function pluginRequest<T>(
   data?: unknown,
 ): Promise<T> {
   try {
-    const paymentSession = window.localStorage.getItem('payment_feishu_session');
+    const approvalSession = window.localStorage.getItem('approval_feishu_session');
     const isFormData = data instanceof FormData;
     const response = await axiosForBackend({
       url,
@@ -43,12 +45,12 @@ async function pluginRequest<T>(
       data,
       headers: {
         ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
-        ...(paymentSession ? { 'X-Payment-Session': paymentSession } : {}),
+        ...(approvalSession ? { 'X-Approval-Session': approvalSession } : {}),
       },
     });
-    const refreshedSession = response.headers?.['x-payment-session'];
+    const refreshedSession = response.headers?.['x-approval-session'];
     if (typeof refreshedSession === 'string' && refreshedSession) {
-      window.localStorage.setItem('payment_feishu_session', refreshedSession);
+      window.localStorage.setItem('approval_feishu_session', refreshedSession);
     }
     return response.data as T;
   } catch (cause: unknown) {
@@ -92,6 +94,12 @@ export const pluginProfileApi = {
   provisionTarget: (input: TargetProvisioningRequest) =>
     pluginRequest<TargetProvisioningResponse>(
       '/api/approvals/target/provision',
+      'POST',
+      input,
+    ),
+  provisionSource: (input: SourceProvisioningRequest) =>
+    pluginRequest<SourceProvisioningResponse>(
+      '/api/approvals/source/provision',
       'POST',
       input,
     ),

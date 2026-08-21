@@ -1,5 +1,5 @@
-import { ApprovalSubmissionService } from '../../server/modules/payment/approval-submission.service';
-import type { FeishuService } from '../../server/modules/payment/feishu.service';
+import { ApprovalSubmissionService } from '../../server/modules/approval/approval-submission.service';
+import type { FeishuService } from '../../server/modules/approval/feishu.service';
 
 describe('ApprovalSubmissionService', () => {
   it('uses the official target instance endpoint with the current operator identity', async () => {

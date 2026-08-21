@@ -1,6 +1,6 @@
-import { TargetFieldMatchingService } from '../../server/modules/payment/target-field-matching.service';
+import { TargetFieldMatchingService } from '../../server/modules/approval/target-field-matching.service';
 import type { ApprovalControl } from '../../shared/approval';
-import type { BitableFieldMeta } from '../../server/modules/payment/bitable-record.service';
+import type { BitableFieldMeta } from '../../server/modules/approval/bitable-record.service';
 
 describe('TargetFieldMatchingService', () => {
   it('recommends a stable Base field ID only when name and type match', () => {

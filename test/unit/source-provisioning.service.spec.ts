@@ -1,6 +1,6 @@
-import type { ApprovalSchemaService } from '../../server/modules/payment/approval-schema.service';
-import type { FeishuService } from '../../server/modules/payment/feishu.service';
-import { SourceProvisioningService } from '../../server/modules/payment/source-provisioning.service';
+import type { ApprovalSchemaService } from '../../server/modules/approval/approval-schema.service';
+import type { FeishuService } from '../../server/modules/approval/feishu.service';
+import { SourceProvisioningService } from '../../server/modules/approval/source-provisioning.service';
 import type { ApprovalSchema } from '../../shared/approval';
 
 describe('SourceProvisioningService', () => {

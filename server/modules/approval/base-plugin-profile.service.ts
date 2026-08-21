@@ -28,10 +28,11 @@ import { baseReferenceFromUrl } from './base-reference';
 const DEFAULT_PROFILE_CONFIG: BasePluginProfileConfig = {
   version: 1,
   page: {
-    title: '审批提审',
-    visibleModules: [],
+    title: 'Approval Base Studio',
+    visibleModules: ['approvals'],
+    sourceSyncIntervalSeconds: 60,
   },
-  businessModules: ['payment'],
+  businessModules: ['approvals'],
   targetApprovals: [],
   sourceApprovals: [],
 };
@@ -136,6 +137,7 @@ export class BasePluginProfileService {
         acceptedStatuses: ['PENDING', 'APPROVED', 'REJECTED', 'CANCELED', 'DELETED'],
         tableStrategy: 'one-table-per-source',
         mode: 'api',
+        intervalSeconds: 60,
       },
       syncState: {},
     };

@@ -8,12 +8,12 @@ const MIN_INTERVAL_SECONDS = 10;
 
 @Injectable()
 export class SourceSyncSchedulerService implements OnModuleInit, OnModuleDestroy {
-  private readonly intervalMs = Math.max(
+  private readonly running = new Set<string>();
+  private timer?: NodeJS.Timeout;
+  private intervalMs = Math.max(
     MIN_INTERVAL_SECONDS,
     Number(process.env.SOURCE_SYNC_INTERVAL_SECONDS || DEFAULT_INTERVAL_SECONDS),
   ) * 1000;
-  private readonly running = new Set<string>();
-  private timer?: NodeJS.Timeout;
 
   constructor(
     private readonly basePluginProfiles: BasePluginProfileService,
@@ -34,6 +34,19 @@ export class SourceSyncSchedulerService implements OnModuleInit, OnModuleDestroy
 
   private async syncAll(): Promise<void> {
     const configurations = await this.basePluginProfiles.listSourceConfigurations();
+    const configuredIntervals = configurations
+      .map((item) => item.source.syncPolicy.intervalSeconds)
+      .filter((value: number | undefined): value is number => typeof value === 'number');
+    if (configuredIntervals.length) {
+      this.intervalMs = Math.min(...configuredIntervals) * 1000;
+      if (this.timer) {
+        clearInterval(this.timer);
+        this.timer = setInterval(() => {
+          void this.syncAll();
+        }, this.intervalMs);
+        this.timer.unref();
+      }
+    }
     await Promise.all(configurations.map(async (item) => {
       const key = `${item.tenantId}:${item.baseRef}:${item.source.sourceTableBinding.sourceApprovalCode}`;
       if (this.running.has(key)) return;
