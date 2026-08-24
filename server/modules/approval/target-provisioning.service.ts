@@ -8,6 +8,7 @@ import {
   TargetProvisioningResultSchema,
   TargetTableDestinationSchema,
 } from '../../../shared/approval';
+import { isComputedApprovalControl } from '../../../shared/approval';
 import type {
   ApprovalControl,
   ApprovalSchema,
@@ -63,7 +64,7 @@ interface FeishuListFieldResponse {
 }
 
 const TARGET_SYSTEM_FIELD_DEFINITIONS = [
-  { key: 'instanceCodeFieldId', name: '审批实例Code', apiType: 1 },
+  { key: 'instanceCodeFieldId', name: '审批实例编号', apiType: 1 },
   { key: 'statusFieldId', name: '审批状态', apiType: 1 },
   { key: 'submittedAtFieldId', name: '提交时间', apiType: 5 },
   { key: 'batchIdFieldId', name: '批次ID', apiType: 1 },
@@ -111,7 +112,13 @@ export class TargetProvisioningService {
     const validatedFieldSources = z
       .record(z.string(), TargetFieldSourceInputSchema)
       .parse(fieldSources) as Record<string, TargetFieldSourceInput>;
-    this.validateSchema(validatedSchema);
+    const provisionableSchema: ApprovalSchema = {
+      ...validatedSchema,
+      controls: validatedSchema.controls.filter(
+        (control: ApprovalControl) => !isComputedApprovalControl(control),
+      ),
+    };
+    this.validateSchema(provisionableSchema);
     const controlIds = new Set(validatedSchema.controls.map((control) => control.id));
     for (const controlId of Object.keys(validatedFieldSources)) {
       if (!controlIds.has(controlId)) {
@@ -131,7 +138,7 @@ export class TargetProvisioningService {
     );
 
     const targetFieldBindings: TargetFieldBinding[] = [];
-    for (const control of validatedSchema.controls) {
+    for (const control of provisionableSchema.controls) {
       const mapping = this.mappingFor(control);
       const fieldId = await this.createField(
         token,
@@ -211,7 +218,7 @@ export class TargetProvisioningService {
       const control = controls.get(binding.targetControlId);
       if (!control) throw new BadRequestException(`字段来源配置引用了不存在的审批控件 ${binding.targetControlId}`);
       if (source.kind === 'base-field' && source.baseTableId !== target.targetTableBinding.baseTableId) {
-        throw new BadRequestException(`审批控件 ${control.id} 暂不支持跨 Table 字段来源`);
+        throw new BadRequestException(`审批控件 ${control.id} 暂不支持跨数据表字段来源`);
       }
       this.validateFieldSource(control, source);
       return { ...binding, source };
@@ -499,7 +506,7 @@ export class TargetProvisioningService {
       token,
       baseAppToken,
       tableId,
-      '审批实例Code',
+      '审批实例编号',
     );
     return marker?.type === 1 ? tableId : undefined;
   }

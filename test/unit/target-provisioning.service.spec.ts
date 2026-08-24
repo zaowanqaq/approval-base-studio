@@ -198,6 +198,57 @@ describe('TargetProvisioningService', () => {
     ).rejects.toThrow();
   });
 
+  it('excludes computed formula controls from submit table provisioning', async () => {
+    const schema: ApprovalSchema = {
+      approvalCode: 'approval-target-formula-001',
+      approvalName: '脱敏计算目标审批',
+      controls: [
+        {
+          id: 'control-target-input-001',
+          name: '项目名称',
+          type: 'input',
+          required: true,
+          visible: true,
+        },
+        {
+          id: 'control-target-formula-001',
+          name: '毛利率',
+          type: 'formula',
+          required: true,
+          visible: true,
+        },
+      ],
+      nodes: [],
+    };
+    const api = jest.fn().mockImplementation((path: string) => {
+      if (path.endsWith('/tables')) return Promise.resolve({ table_id: 'table-formula-001' });
+      if (path.endsWith('/fields')) {
+        const fieldCount = api.mock.calls.filter((call: unknown[]) =>
+          String(call[0]).endsWith('/fields'),
+        ).length;
+        return Promise.resolve({ field: { field_id: `field-formula-${fieldCount}` } });
+      }
+      return Promise.resolve({});
+    });
+    const service = new TargetProvisioningService(
+      { api } as unknown as FeishuService,
+      { readApprovalSchema: jest.fn().mockResolvedValue(schema) } as unknown as ApprovalSchemaService,
+    );
+
+    const result = await service.provision('redacted-user-token', {
+      approvalCode: schema.approvalCode,
+      destination: {
+        kind: 'existing-base',
+        baseUrl: 'https://example.feishu.cn/base/redacted-base',
+      },
+    });
+
+    expect(result.targetFieldBindings.map((binding) => binding.targetControlId))
+      .toEqual(['control-target-input-001']);
+    expect(api.mock.calls.some((call) => String(call[0]).includes('/fields')
+      && String((call[2] as { body?: string })?.body || '').includes('毛利率'))).toBe(false);
+  });
+
   it('recovers a table and fields after an uncertain create response', async () => {
     const schema: ApprovalSchema = {
       approvalCode: 'approval-target-retry-001',
@@ -225,7 +276,7 @@ describe('TargetProvisioningService', () => {
         return Promise.resolve({
           items: [
             { field_id: 'field-retry-text', field_name: '申请说明', type: 1 },
-            { field_id: 'field-retry-instance', field_name: '审批实例Code', type: 1 },
+            { field_id: 'field-retry-instance', field_name: '审批实例编号', type: 1 },
             { field_id: 'field-retry-status', field_name: '审批状态', type: 1 },
             { field_id: 'field-retry-submitted', field_name: '提交时间', type: 5 },
             { field_id: 'field-retry-batch', field_name: '批次ID', type: 1 },

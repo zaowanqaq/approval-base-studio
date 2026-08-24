@@ -470,7 +470,7 @@ describe('TargetLaunchService', () => {
       approvalCode: schema.approvalCode,
       recordIds: ['record-test-001'],
       idempotencyKey: 'schema-changed',
-    })).rejects.toThrow('Schema 已发生变化');
+    })).rejects.toThrow('审批结构已发生变化');
     expect(submission.initiate).not.toHaveBeenCalled();
   });
 });

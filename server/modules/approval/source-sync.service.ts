@@ -273,7 +273,7 @@ export class SourceSyncService {
     const filterValue = instanceCode.replace(/\\/gu, '\\\\').replace(/"/gu, '\\"');
     const query = new URLSearchParams({
       page_size: '100',
-      filter: `CurrentValue.[审批实例Code] = "${filterValue}"`,
+      filter: `CurrentValue.[审批实例编号] = "${filterValue}"`,
     });
     const response = await this.feishu.api<BaseRecordListResponse>(
       `bitable/v1/apps/${baseToken}/tables/${tableId}/records?${query.toString()}`,

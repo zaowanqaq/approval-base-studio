@@ -45,7 +45,7 @@ interface FeishuCreateFieldResponse {
 }
 
 const SOURCE_SYSTEM_FIELD_DEFINITIONS = [
-  { key: 'instanceCodeFieldId', name: '审批实例Code', apiType: 1 },
+  { key: 'instanceCodeFieldId', name: '审批实例编号', apiType: 1 },
   { key: 'statusFieldId', name: '审批状态', apiType: 1 },
   { key: 'submittedAtFieldId', name: '审批提交时间', apiType: 5 },
   { key: 'syncedAtFieldId', name: '同步时间', apiType: 5 },
@@ -193,7 +193,7 @@ export class SourceProvisioningService {
       const nameKey = definition.name.replace(/\s+/gu, '').toLowerCase();
       if (controlNames.has(nameKey)) {
         throw new BadRequestException(
-          `审批控件名称“${definition.name}”与 Source 系统字段冲突，请先修改审批控件名称`,
+          `审批控件名称“${definition.name}”与同步系统字段冲突，请先修改审批控件名称`,
         );
       }
     }
@@ -243,7 +243,7 @@ export class SourceProvisioningService {
     const appToken = response.app?.app_token;
     const defaultTableId = response.app?.default_table_id;
     if (!appToken || !defaultTableId) {
-      throw new Error('飞书创建多维表格成功但未返回 Base 或默认数据表标识');
+      throw new Error('飞书创建多维表格成功但未返回表格或默认数据表标识');
     }
     return {
       appToken,

@@ -5,6 +5,7 @@ import {
   TargetLaunchRequestSchema,
   TargetLaunchResponseSchema,
 } from '../../../shared/approval';
+import { isComputedApprovalControl } from '../../../shared/approval';
 import type {
   ApprovalControl,
   ApprovalSchema,
@@ -281,7 +282,7 @@ export class TargetLaunchService {
       const instanceField = this.bitable.resolveField(
         fields,
         target.targetTableBinding.writeBackFields.instanceCodeFieldId,
-        'Target 审批实例 Code 回写',
+        '提审审批实例编号回写',
       );
       const existingInstance = record.fields[instanceField.fieldName];
       if (!this.empty(existingInstance)) {
@@ -291,6 +292,7 @@ export class TargetLaunchService {
       }
       const controls: PreparedControl[] = [];
       for (const control of schema.controls) {
+        if (isComputedApprovalControl(control)) continue;
         const binding = bindingMap.get(control.id);
         if (!binding) {
           throw new BadRequestException(
@@ -635,12 +637,12 @@ export class TargetLaunchService {
     const currentFingerprint = approvalSchemaFingerprint(schema);
     if (!target.approvalSchemaFingerprint) {
       throw new BadRequestException(
-        '目标审批配置没有保存 Schema 快照，请重新读取并保存该审批流配置后再提审',
+        '目标审批配置没有保存审批结构快照，请重新读取并保存该审批流配置后再提审',
       );
     }
     if (target.approvalSchemaFingerprint !== currentFingerprint) {
       throw new BadRequestException(
-        '目标审批 Schema 已发生变化（可能新增、删除、改名或修改类型/必填性），请重新读取并保存配置',
+        '目标审批结构已发生变化（可能新增、删除、改名或修改类型/必填性），请重新读取并保存配置',
       );
     }
     for (const control of schema.controls) {
@@ -649,6 +651,7 @@ export class TargetLaunchService {
           `审批控件 ${control.id}（${control.name}）包含明细控件，本轮不支持复杂嵌套结构`,
         );
       }
+      if (isComputedApprovalControl(control)) continue;
       this.formType(control);
     }
     if (schema.nodes.some((node) => node.requiresApproverSelection === true)) {
@@ -669,6 +672,7 @@ export class TargetLaunchService {
       }
     }
     for (const control of schema.controls) {
+      if (isComputedApprovalControl(control)) continue;
       if (!bindingIds.has(control.id)) {
         throw new BadRequestException(
           `审批控件 ${control.id}（${control.name}）缺少字段绑定`,
@@ -684,7 +688,7 @@ export class TargetLaunchService {
     targetTableId: string,
   ): BitableFieldMeta {
     if (source.baseTableId !== targetTableId) {
-      throw new BadRequestException(this.controlError(control, '暂不支持跨 Table 字段来源'));
+      throw new BadRequestException(this.controlError(control, '暂不支持跨数据表字段来源'));
     }
     const field = fieldMap.get(source.baseFieldId);
     if (!field) throw new BadRequestException(this.controlError(control, `来源字段 ${source.baseFieldId} 不存在`));

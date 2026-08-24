@@ -200,12 +200,12 @@ export class BasePluginProfileService {
   ): Promise<BasePluginProfileResponse> {
     const baseRef = baseReferenceFromUrl(baseUrl);
     const existing = await this.get(tenantId, baseUrl);
-    if (!existing) throw new BadRequestException('该 Base 尚未配置 Source 审批流');
+    if (!existing) throw new BadRequestException('该多维表格尚未配置同步审批流');
     const source = existing.config.sourceApprovals?.find(
       (item: BasePluginSourceConfiguration) =>
         item.sourceTableBinding.sourceApprovalCode === approvalCode,
     );
-    if (!source) throw new BadRequestException('该 Base 尚未配置目标 Source 审批流');
+    if (!source) throw new BadRequestException('该多维表格尚未配置目标同步审批流');
     const nextConfig: BasePluginProfileConfig = {
       ...existing.config,
       sourceApprovals: (existing.config.sourceApprovals || []).map(
@@ -240,13 +240,13 @@ export class BasePluginProfileService {
       )
       .limit(1);
     const row = rows[0];
-    if (!row) throw new BadRequestException('该 Base 尚未配置 Source 审批流');
+    if (!row) throw new BadRequestException('该多维表格尚未配置同步审批流');
     const currentConfig = BasePluginProfileConfigSchema.parse(row.config) as BasePluginProfileConfig;
     const source = currentConfig.sourceApprovals?.find(
       (item: BasePluginSourceConfiguration) =>
         item.sourceTableBinding.sourceApprovalCode === approvalCode,
     );
-    if (!source) throw new BadRequestException('该 Base 尚未配置目标 Source 审批流');
+    if (!source) throw new BadRequestException('该多维表格尚未配置目标同步审批流');
     const nextConfig: BasePluginProfileConfig = {
       ...currentConfig,
       sourceApprovals: (currentConfig.sourceApprovals || []).map(
@@ -304,7 +304,7 @@ export class BasePluginProfileService {
       .returning();
     const row = rows[0];
     if (!row) {
-      throw new Error('保存 Base 插件配置后未返回记录');
+      throw new Error('保存多维表格插件配置后未返回记录');
     }
     return this.toResponse(row);
   }

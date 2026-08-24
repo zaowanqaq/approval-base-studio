@@ -5,6 +5,10 @@ describe('SourceSyncService value mapping', () => {
     expect(sourceValue('1000000000000.01', 'amount')).toBe('1000000000000.01');
   });
 
+  it('keeps computed formula values as strings to avoid floating point conversion', () => {
+    expect(sourceValue('0.07', 'formula')).toBe('0.07');
+  });
+
   it('converts approval dates to Base timestamps', () => {
     expect(sourceValue('2026-08-11 10:30:00', 'date')).toBe(
       Date.parse('2026-08-11 10:30:00'),

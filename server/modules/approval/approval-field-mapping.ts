@@ -17,6 +17,7 @@ const APPROVAL_FIELD_MAPPINGS: Readonly<
   radio: { apiType: 3, baseFieldType: 'select' },
   number: { apiType: 2, baseFieldType: 'number' },
   amount: { apiType: 2, baseFieldType: 'amount' },
+  formula: { apiType: 2, baseFieldType: 'number' },
   date: { apiType: 5, baseFieldType: 'date' },
   datetime: { apiType: 5, baseFieldType: 'date' },
   checkbox: { apiType: 7, baseFieldType: 'checkbox' },

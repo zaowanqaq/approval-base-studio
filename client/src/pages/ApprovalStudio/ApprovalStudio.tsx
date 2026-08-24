@@ -32,13 +32,7 @@ import type {
   TargetLaunchResponse,
   TargetProvisioningResponse,
 } from '@shared/approval';
-
-const DEFAULT_PROFILE_CONFIG: BasePluginProfileConfig = {
-  version: 1,
-  page: { title: 'Approval Base Studio', visibleModules: ['approvals'], sourceSyncIntervalSeconds: 60 },
-  businessModules: ['approvals'],
-  targetApprovals: [],
-};
+import { isComputedApprovalControl } from '@shared/approval';
 
 function sourceInputsFromBindings(
   bindings: BasePluginTargetConfiguration['targetFieldBindings'],
@@ -50,6 +44,51 @@ function sourceInputsFromBindings(
   return Object.fromEntries(entries);
 }
 
+function profileTargets(profile: BasePluginProfileResponse | null): BasePluginTargetConfiguration[] {
+  const targets = profile?.config?.targetApprovals;
+  return Array.isArray(targets) ? targets : [];
+}
+
+function normalizedProfileConfig(profile: BasePluginProfileResponse | null): BasePluginProfileConfig {
+  const config = profile?.config;
+  return {
+    version: 1,
+    page: {
+      title: config?.page?.title || '通用审批多维表格工作台',
+      visibleModules: config?.page?.visibleModules || ['approvals'],
+      sourceSyncIntervalSeconds: config?.page?.sourceSyncIntervalSeconds || 60,
+    },
+    businessModules: config?.businessModules || ['approvals'],
+    targetApprovals: profileTargets(profile),
+    sourceApprovals: config?.sourceApprovals || [],
+  };
+}
+
+function approvalControlType(type: string): string {
+  const key = type.trim().toLowerCase().replace(/[-_]/gu, '');
+  const labels: Record<string, string> = {
+    input: '文本',
+    text: '文本',
+    textarea: '多行文本',
+    number: '数字',
+    amount: '金额',
+    date: '日期',
+    datetime: '日期时间',
+    radio: '单选',
+    radiov2: '单选',
+    checkbox: '复选',
+    checkboxv2: '复选',
+    contact: '人员',
+    user: '人员',
+    department: '部门',
+    attachment: '附件',
+    attachmentv2: '附件',
+    image: '图片',
+    imagev2: '图片',
+  };
+  return labels[key] || '自定义控件';
+}
+
 const PluginConfigPage: React.FC = () => {
   const [baseUrl, setBaseUrl] = useState<string>('');
   const [baseName, setBaseName] = useState<string>('');
@@ -58,7 +97,7 @@ const PluginConfigPage: React.FC = () => {
   const [launchableApprovals, setLaunchableApprovals] = useState<ApprovalDefinitionSummary[]>([]);
   const [launchablePageToken, setLaunchablePageToken] = useState<string | undefined>(undefined);
   const [tableName, setTableName] = useState<string>('');
-  const [pageTitle, setPageTitle] = useState<string>('Approval Base Studio');
+  const [pageTitle, setPageTitle] = useState<string>('通用审批多维表格工作台');
   const [sourceSyncIntervalSeconds, setSourceSyncIntervalSeconds] = useState<number>(60);
   const [schema, setSchema] = useState<ApprovalSchema | null>(null);
   const [profile, setProfile] = useState<BasePluginProfileResponse | null>(null);
@@ -119,7 +158,7 @@ const PluginConfigPage: React.FC = () => {
       ...config,
       page: {
         ...config.page,
-        title: pageTitle.trim() || 'Approval Base Studio',
+        title: pageTitle.trim() || '通用审批多维表格工作台',
         visibleModules: ['approvals'],
         sourceSyncIntervalSeconds,
       },
@@ -140,9 +179,9 @@ const PluginConfigPage: React.FC = () => {
     nextProfile: BasePluginProfileResponse | null,
     targetApprovalCode?: string,
   ): void {
-    const target = nextProfile?.config.targetApprovals.find(
+    const target = profileTargets(nextProfile).find(
       (item) => item.targetTableBinding.targetApprovalCode === targetApprovalCode,
-    ) || nextProfile?.config.targetApprovals[0];
+    ) || profileTargets(nextProfile)[0];
     setFieldSources(sourceInputsFromBindings(target?.targetFieldBindings || []));
   }
 
@@ -191,7 +230,7 @@ const PluginConfigPage: React.FC = () => {
     if (targetResult && targetResult.targetTableBinding.targetApprovalCode === approvalCode.trim()) {
       return targetResult.targetFieldBindings;
     }
-    return profile?.config.targetApprovals.find(
+    return profileTargets(profile).find(
       (target) => target.targetTableBinding.targetApprovalCode === approvalCode.trim(),
     )?.targetFieldBindings || [];
   }
@@ -204,7 +243,7 @@ const PluginConfigPage: React.FC = () => {
 
   async function loadProfile(): Promise<void> {
     if (!baseUrl.trim()) {
-      setError('请先填写 Base 链接');
+      setError('请先填写多维表格链接');
       return;
     }
     setWorking(true);
@@ -215,14 +254,14 @@ const PluginConfigPage: React.FC = () => {
       setProfile(nextProfile);
       if (nextProfile?.config) {
         setBaseName(nextProfile.baseName || '');
-        setPageTitle(nextProfile.config.page.title);
-        setSourceSyncIntervalSeconds(nextProfile.config.page.sourceSyncIntervalSeconds || 60);
-        setLaunchApprovalCode((current) => current || nextProfile.config.targetApprovals[0]?.targetTableBinding.targetApprovalCode || '');
+        setPageTitle(nextProfile.config.page?.title || '通用审批多维表格工作台');
+        setSourceSyncIntervalSeconds(nextProfile.config.page?.sourceSyncIntervalSeconds || 60);
+        setLaunchApprovalCode((current) => current || profileTargets(nextProfile)[0]?.targetTableBinding.targetApprovalCode || '');
         applyStoredTargetSources(nextProfile);
       }
-      setMessage(nextProfile ? '已读取该 Base 的插件配置' : '该 Base 尚未配置插件');
+      setMessage(nextProfile ? '已读取该多维表格的插件配置' : '该多维表格还没有插件配置。请先识别审批流并创建提审表。');
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : '读取 Base 配置失败');
+      setError(cause instanceof Error ? cause.message : '读取多维表格配置失败');
     } finally {
       setWorking(false);
     }
@@ -230,7 +269,7 @@ const PluginConfigPage: React.FC = () => {
 
   async function readSchema(): Promise<void> {
     if (!approvalCode.trim()) {
-      setError('请填写审批 Code');
+      setError('请填写审批编号');
       return;
     }
     setWorking(true);
@@ -242,7 +281,7 @@ const PluginConfigPage: React.FC = () => {
       applyStoredTargetSources(profile, approvalCode.trim());
       setMessage(`已识别审批流：${nextSchema.approvalName}`);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : '读取审批 Schema 失败');
+      setError(cause instanceof Error ? cause.message : '读取审批结构失败');
     } finally {
       setWorking(false);
     }
@@ -291,7 +330,7 @@ const PluginConfigPage: React.FC = () => {
 
   async function createTargetTable(): Promise<void> {
     if (!baseUrl.trim() || !approvalCode.trim()) {
-      setError('请先填写 Base 链接和审批 Code');
+      setError('请先填写多维表格链接和审批编号');
       return;
     }
     setWorking(true);
@@ -322,7 +361,7 @@ const PluginConfigPage: React.FC = () => {
 
   async function createSourceTable(): Promise<void> {
     if (!baseUrl.trim() || !approvalCode.trim()) {
-      setError('请先填写 Base 链接和审批 Code');
+      setError('请先填写多维表格链接和审批编号');
       return;
     }
     setWorking(true);
@@ -343,7 +382,7 @@ const PluginConfigPage: React.FC = () => {
       setProfile(nextProfile);
       setMessage(`已创建同步表：${result.sourceTableBinding.baseTableName}`);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : '创建 Source 同步表失败');
+      setError(cause instanceof Error ? cause.message : '创建同步表失败');
     } finally {
       setWorking(false);
     }
@@ -351,7 +390,7 @@ const PluginConfigPage: React.FC = () => {
 
   async function syncSourceNow(): Promise<void> {
     if (!baseUrl.trim() || !approvalCode.trim()) {
-      setError('请先填写 Base 链接和审批 Code');
+      setError('请先填写多维表格链接和审批编号');
       return;
     }
     setWorking(true);
@@ -364,7 +403,7 @@ const PluginConfigPage: React.FC = () => {
       const state = result.syncState;
       setMessage(`同步完成：新增/更新 ${state.lastSyncedCount || 0} 条，跳过 ${state.lastSkippedCount || 0} 条`);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : 'Source 同步失败');
+      setError(cause instanceof Error ? cause.message : '同步审批实例失败');
     } finally {
       setWorking(false);
     }
@@ -372,14 +411,14 @@ const PluginConfigPage: React.FC = () => {
 
   async function saveProfile(): Promise<void> {
     if (!baseUrl.trim()) {
-      setError('请先填写 Base 链接');
+      setError('请先填写多维表格链接');
       return;
     }
     setWorking(true);
     setError('');
     setMessage('');
     try {
-      let config = profile?.config || DEFAULT_PROFILE_CONFIG;
+      let config = normalizedProfileConfig(profile);
       const configuredTarget = config.targetApprovals.find(
         (target) => target.targetTableBinding.targetApprovalCode === approvalCode.trim(),
       );
@@ -401,7 +440,7 @@ const PluginConfigPage: React.FC = () => {
         config: configForUi(config),
       });
       setProfile(saved);
-      setMessage('Base 插件配置已保存');
+      setMessage('多维表格插件配置已保存');
     } catch (cause: unknown) {
       setError(cause instanceof Error ? cause.message : '保存插件配置失败');
     } finally {
@@ -434,6 +473,11 @@ const PluginConfigPage: React.FC = () => {
     return [];
   }
 
+  const visibleSchemaControls = schema?.controls.filter(
+    (control) => !isComputedApprovalControl(control),
+  ) || [];
+  const computedSchemaCount = schema?.controls.filter(isComputedApprovalControl).length || 0;
+
   async function loadLaunchSchema(): Promise<void> {
     if (!launchApprovalCode.trim()) {
       setError('请先选择已配置的目标审批流');
@@ -444,9 +488,9 @@ const PluginConfigPage: React.FC = () => {
     try {
       const nextSchema = await pluginProfileApi.readSchema(launchApprovalCode.trim());
       setLaunchSchema(nextSchema);
-      setMessage(`已读取发起 Schema：${nextSchema.approvalName}`);
+      setMessage(`已读取发起表单：${nextSchema.approvalName}`);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : '读取发起 Schema 失败');
+      setError(cause instanceof Error ? cause.message : '读取发起表单失败');
     } finally {
       setWorking(false);
     }
@@ -470,7 +514,7 @@ const PluginConfigPage: React.FC = () => {
 
   async function launchTargetApproval(): Promise<void> {
     if (!baseUrl.trim() || !launchApprovalCode.trim()) {
-      setError('请先填写 Base 链接并选择目标审批流');
+      setError('请先填写多维表格链接并选择目标审批流');
       return;
     }
     if (!selectedRecordIds.length) {
@@ -494,7 +538,7 @@ const PluginConfigPage: React.FC = () => {
       setLaunchResult(result);
       setMessage(result.message || `已发起 ${result.results.length} 条审批`);
     } catch (cause: unknown) {
-      setError(cause instanceof Error ? cause.message : '发起 Target 审批失败');
+      setError(cause instanceof Error ? cause.message : '发起目标审批失败');
     } finally {
       setWorking(false);
     }
@@ -505,18 +549,18 @@ const PluginConfigPage: React.FC = () => {
       <div className="mx-auto flex max-w-5xl flex-col gap-6">
         <header className="flex flex-col gap-2">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Layers3 className="size-4" /> Base 级插件配置
+            <Layers3 className="size-4" /> 多维表格级插件配置
           </div>
           <h1 className="text-3xl font-semibold tracking-tight">通用审批工作台配置</h1>
           <p className="max-w-3xl text-sm text-muted-foreground">
-            Source 同步由插件自动使用审批 API 完成。这里负责识别审批流程、创建数据表和保存这个 Base 的页面配置。
+            审批实例同步由插件自动完成。这里负责识别审批流程、创建数据表和保存当前多维表格的页面配置。
           </p>
         </header>
 
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><ShieldCheck className="size-4" />飞书身份</CardTitle>
-            <CardDescription>读取审批 Schema、搜索可发起流程和创建提审表需要当前用户完成飞书授权。</CardDescription>
+            <CardDescription>读取审批结构、搜索可发起流程和创建提审表需要当前用户完成飞书授权。</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap items-center gap-3">
             {authLoading ? (
@@ -547,17 +591,17 @@ const PluginConfigPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>1. 连接已有 Base</CardTitle>
-            <CardDescription>只填写飞书 Base 链接，不要填写 Base Token 或密钥。</CardDescription>
+            <CardTitle>1. 连接已有多维表格</CardTitle>
+            <CardDescription>只填写飞书多维表格链接，不要填写访问令牌或密钥。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-2">
             <div className="grid gap-2 md:col-span-2">
-              <Label htmlFor="base-url">Base 链接</Label>
+              <Label htmlFor="base-url">多维表格链接</Label>
               <Input id="base-url" value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="https://example.feishu.cn/base/..." />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="base-name">配置名称（可选）</Label>
-              <Input id="base-name" value={baseName} onChange={(event) => setBaseName(event.target.value)} placeholder="例如：财务审批 Base" />
+              <Input id="base-name" value={baseName} onChange={(event) => setBaseName(event.target.value)} placeholder="例如：财务审批表格" />
             </div>
             <div className="flex items-end">
               <Button type="button" variant="outline" onClick={() => void loadProfile()} disabled={working}>
@@ -570,7 +614,7 @@ const PluginConfigPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>2. 识别目标审批流</CardTitle>
-            <CardDescription>可按关键词搜索当前用户可发起的审批流，也可以直接填写审批 Code。</CardDescription>
+            <CardDescription>可按关键词搜索当前用户可发起的审批流，也可以直接填写审批编号。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid gap-2 md:grid-cols-[1fr_auto]">
@@ -586,7 +630,7 @@ const PluginConfigPage: React.FC = () => {
             </div>
             {launchableApprovals.length > 0 && (
               <div className="grid gap-2 rounded-lg border bg-muted/20 p-3">
-                <span className="text-xs text-muted-foreground">选择一个原生审批流后，再读取 Schema：</span>
+                <span className="text-xs text-muted-foreground">选择一个原生审批流后，再读取审批结构：</span>
                 <div className="grid gap-2 md:grid-cols-2">
                   {launchableApprovals.map((item: ApprovalDefinitionSummary) => (
                     <Button
@@ -620,12 +664,12 @@ const PluginConfigPage: React.FC = () => {
             )}
             <div className="grid gap-4 md:grid-cols-[1fr_auto]">
             <div className="grid gap-2">
-              <Label htmlFor="approval-code">审批 Code</Label>
-              <Input id="approval-code" value={approvalCode} onChange={(event) => setApprovalCode(event.target.value)} placeholder="填写审批定义 Code" />
+              <Label htmlFor="approval-code">审批编号</Label>
+              <Input id="approval-code" value={approvalCode} onChange={(event) => setApprovalCode(event.target.value)} placeholder="填写审批定义编号" />
             </div>
             <div className="flex items-end">
               <Button type="button" variant="outline" onClick={() => void readSchema()} disabled={working}>
-                {working ? <LoaderCircle className="animate-spin" /> : <Search />}读取 Schema
+                {working ? <LoaderCircle className="animate-spin" /> : <Search />}读取审批结构
               </Button>
             </div>
             </div>
@@ -633,13 +677,21 @@ const PluginConfigPage: React.FC = () => {
               <div className="rounded-lg border bg-muted/20 p-4 md:col-span-2">
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <strong>{schema.approvalName}</strong>
-                  <Badge variant="secondary">{schema.controls.length} 个顶层控件</Badge>
+                  <Badge variant="secondary">{visibleSchemaControls.length} 个可配置控件</Badge>
+                  {computedSchemaCount > 0 && (
+                    <Badge variant="outline">{computedSchemaCount} 个自动计算控件</Badge>
+                  )}
                 </div>
+                {computedSchemaCount > 0 && (
+                  <div className="mb-3 rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+                    自动计算控件由飞书审批在提交后计算，不会创建为提审表字段，也不会随审批发起提交；同步表会保存审批实例中的计算结果。
+                  </div>
+                )}
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {schema.controls.map((control) => (
+                  {visibleSchemaControls.map((control) => (
                     <div key={control.id} className="rounded-md border bg-background p-3 text-sm">
                       <strong className="block truncate">{control.name || '未命名控件'}</strong>
-                      <span className="text-muted-foreground">{control.type} · {control.required ? '必填' : '选填'}</span>
+                      <span className="text-muted-foreground">{approvalControlType(control.type)} · {control.required ? '必填' : '选填'}</span>
                       <div className="mt-3 grid gap-2">
                         <Label className="text-xs">数据来源</Label>
                         <select
@@ -658,7 +710,7 @@ const PluginConfigPage: React.FC = () => {
                             } else if (kind === 'base-field') {
                               const firstField = availableTargetFields()[0];
                               if (!firstField) {
-                                setError('请先创建或读取该审批对应的提审 Table，再选择多维表格字段');
+                                 setError('请先创建或读取该审批对应的提审数据表，再选择多维表格字段');
                                 return;
                               }
                               setFieldSource(control.id, {
@@ -820,7 +872,7 @@ const PluginConfigPage: React.FC = () => {
                                       };
                                       setFieldSource(control.id, { ...current, parts: nextParts });
                                     }}
-                                    placeholder="手动输入项 key"
+                                      placeholder="手动输入项名称"
                                   />
                                 )}
                               </div>
@@ -865,7 +917,7 @@ const PluginConfigPage: React.FC = () => {
                                   };
                                   setFieldSource(control.id, { ...current, operands });
                                 }}
-                                placeholder={`第 ${operandIndex + 1} 个手动数字来源 key`}
+                                placeholder={`第 ${operandIndex + 1} 个手动数字来源名称`}
                               />
                             ))}
                           </div>
@@ -881,16 +933,16 @@ const PluginConfigPage: React.FC = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>3. 创建 Source / Target Table</CardTitle>
-            <CardDescription>同一审批流可分别创建实例同步表和提发表；字段映射由审批 Schema 自动生成。</CardDescription>
+            <CardTitle>3. 创建同步表 / 提审表</CardTitle>
+            <CardDescription>同一审批流可分别创建实例同步表和提审表；字段映射由审批结构自动生成。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 md:grid-cols-[1fr_auto]">
             <div className="grid gap-2">
-              <Label htmlFor="table-name">Table 名称（可选）</Label>
+              <Label htmlFor="table-name">提审表名称（可选）</Label>
               <Input id="table-name" value={tableName} onChange={(event) => setTableName(event.target.value)} placeholder="默认使用审批名称-提审" />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="source-table-name">Source Table 名称（可选）</Label>
+              <Label htmlFor="source-table-name">同步表名称（可选）</Label>
               <Input id="source-table-name" value={sourceTableName} onChange={(event) => setSourceTableName(event.target.value)} placeholder="默认使用审批名称" />
             </div>
             <div className="flex flex-wrap items-end gap-2 md:col-span-2">
@@ -907,7 +959,7 @@ const PluginConfigPage: React.FC = () => {
             {sourceResult && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground md:col-span-2">
                 <CheckCircle2 className="size-4 text-primary" />
-                已绑定 Source：{sourceResult.sourceTableBinding.baseTableName} · {sourceResult.syncedFieldBindings.length} 个字段
+                已绑定同步表：{sourceResult.sourceTableBinding.baseTableName} · {sourceResult.syncedFieldBindings.length} 个字段
               </div>
             )}
             {targetResult && (
@@ -922,7 +974,7 @@ const PluginConfigPage: React.FC = () => {
         <Card>
           <CardHeader>
             <CardTitle>4. 页面与同步策略</CardTitle>
-            <CardDescription>按 Base 保存页面标题和 Source 同步频率；所有绑定都来自当前租户配置。</CardDescription>
+            <CardDescription>按多维表格保存页面标题和审批实例同步频率；所有绑定都来自当前租户配置。</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4">
             <div className="grid gap-2">
@@ -930,7 +982,7 @@ const PluginConfigPage: React.FC = () => {
               <Input id="page-title" value={pageTitle} onChange={(event) => setPageTitle(event.target.value)} />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="sync-interval">Source 同步间隔（秒）</Label>
+              <Label htmlFor="sync-interval">审批实例同步间隔（秒）</Label>
               <Input
                 id="sync-interval"
                 type="number"
@@ -942,7 +994,7 @@ const PluginConfigPage: React.FC = () => {
             </div>
             <div className="flex justify-end">
               <Button type="button" variant="outline" onClick={() => void saveProfile()} disabled={working}>
-                {working ? <LoaderCircle className="animate-spin" /> : <Save />}保存 Base 配置
+                {working ? <LoaderCircle className="animate-spin" /> : <Save />}保存多维表格配置
               </Button>
             </div>
           </CardContent>
@@ -969,7 +1021,7 @@ const PluginConfigPage: React.FC = () => {
                   }}
                 >
                   <option value="">请选择目标审批流</option>
-                  {(profile?.config?.targetApprovals || []).map((target) => (
+                  {profileTargets(profile).map((target) => (
                     <option key={target.targetTableBinding.targetApprovalCode} value={target.targetTableBinding.targetApprovalCode}>
                       {target.targetTableBinding.baseTableName} · {target.targetTableBinding.targetApprovalCode}
                     </option>
@@ -978,7 +1030,7 @@ const PluginConfigPage: React.FC = () => {
               </div>
               <div className="flex items-end gap-2">
                 <Button type="button" variant="outline" onClick={() => void loadLaunchSchema()} disabled={working}>
-                  {working ? <LoaderCircle className="animate-spin" /> : <Search />}读取发起 Schema
+                  {working ? <LoaderCircle className="animate-spin" /> : <Search />}读取发起表单
                 </Button>
                 <Button type="button" variant="outline" onClick={() => void readSelectedRecords()} disabled={working}>
                   {working ? <LoaderCircle className="animate-spin" /> : <Table2 />}读取选中记录
@@ -987,12 +1039,12 @@ const PluginConfigPage: React.FC = () => {
             </div>
             <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">
               当前已选择 {selectedRecordIds.length} 条记录
-              {selectedRecordIds.length ? `：${selectedRecordIds.join('、')}` : '。请回到目标提审 Table 选择记录。'}
+              {selectedRecordIds.length ? `：${selectedRecordIds.join('、')}` : '。请回到目标提审数据表选择记录。'}
             </div>
-            {launchSchema && (profile?.config?.targetApprovals || []).find((target) => target.targetTableBinding.targetApprovalCode === launchApprovalCode) && (
+            {launchSchema && profileTargets(profile).find((target) => target.targetTableBinding.targetApprovalCode === launchApprovalCode) && (
               <div className="grid gap-3 rounded-lg border p-4">
                 <strong>手动输入项</strong>
-                {(profile?.config?.targetApprovals || [])
+                  {profileTargets(profile)
                   .find((target) => target.targetTableBinding.targetApprovalCode === launchApprovalCode)
                   ?.targetFieldBindings
                   .map((binding) => {

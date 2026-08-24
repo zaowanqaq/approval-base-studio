@@ -154,7 +154,7 @@ export class ApprovalController {
       const result = await this.sourceProvisioning.provision(token, body);
       const { tenantId, userId } = this.requiredUserContext(req);
       const request = SourceProvisioningRequestSchema.safeParse(body);
-      if (!request.success) throw new BadRequestException('Source 审批流配置格式不正确');
+      if (!request.success) throw new BadRequestException('同步审批流配置格式不正确');
       const baseUrl = request.data.baseUrl || result.sourceTableBinding.baseUrl;
       if (!baseUrl) throw new BadRequestException('Source 配置缺少 Base 链接，无法保存同步配置');
       await this.basePluginProfiles.mergeSourceProvisioning(tenantId, userId, baseUrl, result);
@@ -170,7 +170,7 @@ export class ApprovalController {
       };
     } catch (error: unknown) {
       if (isSourceProvisioningValidationError(error)) {
-        throw new BadRequestException('Source 审批流配置格式不正确');
+        throw new BadRequestException('同步审批流配置格式不正确');
       }
       throw error;
     }
@@ -180,7 +180,7 @@ export class ApprovalController {
   @NeedLogin()
   async syncSource(@Req() req: Request, @Res({ passthrough: true }) res: Response, @Body() body: unknown): Promise<SourceSyncResponse> {
     const request = SourceSyncRequestSchema.safeParse(body);
-    if (!request.success) throw new BadRequestException('Source 同步参数格式不正确');
+    if (!request.success) throw new BadRequestException('审批实例同步参数格式不正确');
     const { tenantId, userId } = this.requiredUserContext(req);
     const token = await this.feishu.userToken(req, res);
     const source = await this.basePluginProfiles.findSource(
@@ -188,7 +188,7 @@ export class ApprovalController {
       request.data.baseUrl,
       request.data.approvalCode,
     );
-    if (!source) throw new BadRequestException('该 Base 尚未配置 Source 审批流');
+    if (!source) throw new BadRequestException('该多维表格尚未配置同步审批流');
     const result = await this.sourceSync.sync(token, source);
     await this.basePluginProfiles.updateSourceSyncState(
       tenantId,
@@ -278,7 +278,7 @@ export class ApprovalController {
       };
     } catch (error: unknown) {
       if (isTargetProvisioningValidationError(error)) {
-        throw new BadRequestException('Target 审批流配置格式不正确');
+        throw new BadRequestException('提审审批流配置格式不正确');
       }
       throw error;
     }
@@ -297,7 +297,7 @@ export class ApprovalController {
     try {
       payload = JSON.parse(body.payload || '{}') as unknown;
     } catch {
-      throw new BadRequestException('Target 审批提交参数格式不正确');
+      throw new BadRequestException('提审审批提交参数格式不正确');
     }
     const { tenantId, userId } = this.requiredUserContext(req);
     const token = await this.feishu.userToken(req, res);

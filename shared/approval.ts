@@ -8,6 +8,10 @@ export type ApprovalRole = z.infer<typeof ApprovalRoleSchema>;
 export const ApprovalControlTypeSchema = nonEmptyString;
 export type ApprovalControlType = z.infer<typeof ApprovalControlTypeSchema>;
 
+export function isComputedApprovalControl(control: { type: string }): boolean {
+  return control.type.trim().toLowerCase().replace(/[-_]/gu, "") === "formula";
+}
+
 export interface ApprovalControl {
   id: string;
   name: string;
